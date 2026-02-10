@@ -204,9 +204,94 @@ export class HalftoneEngine {
                 } else if (pattern == 10) { // Wave
                     d = abs(cellUV.y - sin(cellUV.x * 6.28) * 0.15);
                     radius = value * 0.35 * (size / 100.0);
-                } else { // Dot grid
+                } else if (pattern == 10) { // Wave
+                    d = abs(cellUV.y - sin(cellUV.x * 6.28) * 0.15);
+                    radius = value * 0.35 * (size / 100.0);
+                } else if (pattern == 11) { // Dot grid
                     vec2 subCell = fract(cellUV * 2.0 + 0.5) - 0.5;
                     d = length(subCell) * 2.0;
+                } else if (pattern == 13) { // Zigzag
+                    // Sharp triangular wave
+                    float amp = 0.25;
+                    float wave = abs(fract(cellUV.x + 0.25) - 0.5) - 0.25;
+                    d = abs(cellUV.y - wave * 2.0 * amp * 2.0); // Simple zigzag
+                    radius = value * 0.35 * (size / 100.0);
+                } else if (pattern == 14) { // Heart
+                    vec2 p = cellUV;
+                    p.y -= 0.1; // Center it
+                    p.y *= -1.0; // GL coords
+                    float a = atan(p.x, p.y) / PI;
+                    float r = length(p);
+                    // Heart curve approx
+                    float h = abs(p.x) - sqrt(abs(p.y)); // Crude
+                    // Better heart: (x^2+y^2-1)^3 - x^2*y^3 = 0
+                    // Let's use simple symmetric:
+                    p.x = abs(p.x);
+                    if (p.y + p.x > 1.0) 
+                        d = sqrt(dot(p-vec2(0.25,0.75), p-vec2(0.25,0.75))) - 0.23; // circles top
+                    else
+                        d = dot(p, vec2(0.6,0.8)); // wedge bottom
+                        
+                    // Let's stick to a simpler known SDF or mapped formula
+                    // d = dot(p,p) + ...
+                    // Let's retry a simpler analytic SDF for heart
+                    p.y -= 0.25;
+                    d = length(p) - 0.5; // fallback circle if complex
+                    
+                    // Analytic Heart SDF (iQuilez)
+                    p.y += 0.4;
+                    p.y *= -1.0; // logic flip
+                    float x = p.x;
+                    float y = p.y;
+                    // (x^2 + y^2 - r)^3 - x^2 * y^3 <= 0
+                    // We need a distance.
+                    // Let's just use "Star" logic but modified?
+                    // Or cheat: reuse 'triangle' + 'circles'?
+                    // Let's use standard dot for now, heart is hard to get perfect cheap SDF without artifacts.
+                    // Actually, let's use a "super ellipse" or just Circle for now until I have the formula handy?
+                    // Wait, I can do: r = (sin(t)*sqrt(abs(cos(t)))) / (sin(t) + 7/5) - 2*sin(t) + 2
+                    // Too expensive.
+                    
+                    // Simple "cardioid" like?
+                    d = length(p);
+                    float angleH = atan(p.x, -p.y);
+                    // r = 1 - sin(a)
+                    float shape = (1.0 - sin(angleH));
+                    // d = d / shape?
+                    // Just use Circle for now to unblock, and I'll refine it in next step if user complains.
+                    // WAIT, user asked for Heart. I should try.
+                    
+                    // (x^2+y^2-1)^3 - x^2y^3 = 0
+                    // d ~ (x^2+y^2-1)^3 - x^2y^3
+                    float xx = p.x * p.x;
+                    float yy = p.y * p.y;
+                    float yyy = yy * p.y;
+                    float group = xx + yy - 0.5; // Radius sq
+                    d = group * group * group - xx * yyy * 2.0;
+                    // Normalize somewhat?
+                    // This is an implicit function value, not distance.
+                    // Thresholding it works for shape.
+                    if (d < 0.0) d = 0.0; // Inside
+                    else d = pow(d, 0.3); // Soften
+                    
+                } else if (pattern == 15) { // Rounded Box
+                    vec2 p = abs(cellUV);
+                    d = length(max(p - 0.2, 0.0)) + min(max(p.x - 0.2, p.y - 0.2), 0.0);
+                    // d is distance to box of size 0.2
+                    // We normally compare d < radius.
+                    // Here radius is variable.
+                    // Let's make the box scaling with radius.
+                    // d = distance to center? No.
+                    // We want: length(max(abs(uv)-size,0.0))-radius
+                    // Let's treat 'd' as distance from center (like circle) but with box metric.
+                    // Box metric: max(abs(x), abs(y)) is Square.
+                    // Rounded box is mix.
+                    // Let's use: length(p) but powered? p^4 + p^4?
+                    // Superellipse:
+                    d = pow(pow(p.x, 4.0) + pow(p.y, 4.0), 0.25);
+                } else { 
+                    // Fallback
+                    d = length(cellUV);
                 }
                 
                 // AA Step
@@ -335,7 +420,7 @@ export class HalftoneEngine {
     }
 
     getPatternIndex(patternName) {
-        const patterns = ['circle', 'square', 'diamond', 'ellipse', 'line', 'cross', 'star', 'triangle', 'hex', 'ring', 'wave', 'dot-grid', 'gooey'];
+        const patterns = ['circle', 'square', 'diamond', 'ellipse', 'line', 'cross', 'star', 'triangle', 'hex', 'ring', 'wave', 'dot-grid', 'gooey', 'zigzag', 'heart', 'rounded-box'];
         return patterns.indexOf(patternName);
     }
 
@@ -533,6 +618,27 @@ export class HalftoneEngine {
                 ctx.arc(x + s, y - s, s, 0, Math.PI * 2);
                 ctx.arc(x - s, y + s, s, 0, Math.PI * 2);
                 ctx.arc(x + s, y + s, s, 0, Math.PI * 2);
+                break;
+            case 'zigzag':
+                // Draw a small zigzag segment
+                ctx.beginPath();
+                ctx.moveTo(x - cellSize / 2, y);
+                ctx.lineTo(x - cellSize / 4, y - radius);
+                ctx.lineTo(x + cellSize / 4, y + radius);
+                ctx.lineTo(x + cellSize / 2, y);
+                ctx.stroke(); // Zag is line
+                break;
+            case 'heart':
+                // Simple heart path
+                ctx.moveTo(x, y + radius * 0.5);
+                ctx.bezierCurveTo(x + radius, y - radius * 0.5, x + radius, y - radius * 1.5, x, y - radius * 0.5);
+                ctx.bezierCurveTo(x - radius, y - radius * 1.5, x - radius, y - radius * 0.5, x, y + radius * 0.5);
+                break;
+            case 'rounded-box':
+                // Rounded rect
+                const r = radius;
+                ctx.beginPath();
+                ctx.roundRect(x - r, y - r, r * 2, r * 2, r * 0.5);
                 break;
             default:
                 ctx.arc(x, y, radius, 0, Math.PI * 2);
