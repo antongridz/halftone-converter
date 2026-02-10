@@ -129,21 +129,38 @@ export class HalftoneEngine {
                             
                             float dist = length(pos - neighborPos);
                             
-                            // Metaball function: R / dist
-                            // We act as if "threshold" is 1.0
-                            if (dist < 0.001) dist = 0.001; // Avoid div by zero
+                            // Metaball function: (R / dist)^2
+                            // This creates a sharper "blob" distinct from the long tails of 1/d, 
+                            // but we boost the radius so they merge.
                             
-                            // Use Gaussian-ish falloff for smoother merge? 
-                            // Or standard metaball 1/r. Standard 1/r is easiest but infinite.
-                            // Let's use R / dist.
-                            // To make them merge more, we can increase effective radius slightly for the field?
-                            // Or change power? 
-                            // Try boosting radius by 1.3x so the field reaches further
-                            sum += (radius * 1.3 / dist);
+                            // Try boosting radius significantly to encourage overlap
+                            // If radius * 3.0, then at dist = radius * 3.0, value is 1.0.
+                            // This makes the "iso-surface" (value=1) appear at 3x radius? 
+                            // No, sum += (R*k/d)^2.
+                            // For single dot: 1 = (R*k/d)^2 => d = R*k.
+                            // So 'k' is directly the size multiplier of the isolated dot.
+                            // We want isolated dot to be roughly size 'R' (match Circle).
+                            // So k should be ~1.0 for the *core*.
+                            // But then they won't merge more than circles?
+                            // Actually, (R/d)^2 adds up. 
+                            // midpoint between two R dots at distance 2R (touching): 
+                            // Sum = 1/(1)^2 + 1/(1)^2 = 2.
+                            // So at touching point, value is 2. (Single dot edge is 1).
+                            // This means the "neck" will be wider.
+                            
+                            // Let's use simple R/d but with a threshold adjustment?
+                            // Or just boost the radius influence but threshold higher?
+                            // No, let's keep it simple.
+                            // sum += (radius * 1.5 / dist) ^ 2
+                            
+                            float influence = (radius * 1.5) / dist;
+                            sum += influence * influence;
                         }
                     }
                     // Threshold at 1.0
-                    // Apply smoothstep for AA
+                    // With squared falloff:
+                    // Single dot edge at d = 1.5 * R.
+                    // This makes dots 50% larger than "Size" setting. This might be what's needed for "gooey" look.
                     return aastep(1.0, sum);
                 }
 
