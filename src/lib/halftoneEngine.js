@@ -136,16 +136,14 @@ export class HalftoneEngine {
                             // Use Gaussian-ish falloff for smoother merge? 
                             // Or standard metaball 1/r. Standard 1/r is easiest but infinite.
                             // Let's use R / dist.
-                            sum += (radius / dist);
+                            // To make them merge more, we can increase effective radius slightly for the field?
+                            // Or change power? 
+                            // Try boosting radius by 1.3x so the field reaches further
+                            sum += (radius * 1.3 / dist);
                         }
                     }
                     // Threshold at 1.0
                     // Apply smoothstep for AA
-                    // The 'value' field is 'sum'. We want edges where sum = 1.0.
-                    // So we pass 'sum' to aastep with threshold 1.0.
-                    // Invert because standard logic returns 1.0 for "dark" (ink), 
-                    // and here high sum means "close to center" i.e. ink.
-                    // aastep(threshold, value) -> 0 if val < thresh, 1 if val > thresh.
                     return aastep(1.0, sum);
                 }
 
