@@ -127,35 +127,20 @@ export class HalftoneEngine {
                 // Gooey (Metaballs)
                 if (pattern == 12) {
                     float sum = 0.0;
-                    for (int y = -1; y <= 1; y++) {
-                        for (int x = -1; x <= 1; x++) {
+                    // Increase kernel to 5x5 to avoid clipping artifacts at cell boundaries
+                    for (int y = -2; y <= 2; y++) {
+                        for (int x = -2; x <= 2; x++) {
                             vec2 neighborCell = cell + vec2(float(x), float(y));
                             vec2 neighborPos = (neighborCell + 0.5) * cellSize;
                             
-                            // Transform back to UV space to sample image intensity
                             vec2 unrotated = invRot * (neighborPos - center) + center;
                             vec2 neighborSampleUV = unrotated / u_resolution;
-                            
-                            // Clamp UV
                             neighborSampleUV = clamp(neighborSampleUV, 0.0, 1.0);
                             
                             float val = getChannelValue(neighborSampleUV, u_channel);
                             float radius = sqrt(val) * 0.5 * cellSize * (size / 100.0);
                             
                             float dist = length(pos - neighborPos);
-                            
-                            // Metaball function: (R / dist)^2
-                            // This creates a sharper "blob" distinct from the long tails of 1/d, 
-                            // but we boost the radius so they merge.
-                            
-                            // Try boosting radius significantly to encourage overlap
-                            // If radius * 3.0, then at dist = radius * 3.0, value is 1.0.
-                            // This makes the "iso-surface" (value=1) appear at 3x radius? 
-                            // No, sum += (R*k/d)^2.
-                            // For single dot: 1 = (R*k/d)^2 => d = R*k.
-                            // So 'k' is directly the size multiplier of the isolated dot.
-                            // We want isolated dot to be roughly size 'R' (match Circle).
-                            // So k should be ~1.0 for the *core*.
                             // But then they won't merge more than circles?
                             // Actually, (R/d)^2 adds up. 
                             // midpoint between two R dots at distance 2R (touching): 
