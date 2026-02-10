@@ -215,61 +215,55 @@ export class HalftoneEngine {
                     radius = value * 0.35 * (size / 100.0);
                 } else if (pattern == 14) { // Heart
                     vec2 p = cellUV;
-                    p.y -= 0.1; // Center it
-                    p.y *= -1.0; // GL coords
-                    float a = atan(p.x, p.y) / PI;
-                    float r = length(p);
-                    // Heart curve approx
-                    float h = abs(p.x) - sqrt(abs(p.y)); // Crude
-                    // Better heart: (x^2+y^2-1)^3 - x^2*y^3 = 0
-                    // Let's use simple symmetric:
+                    p.y += 0.1; // Shift up slightly to center vertically
+                    p.y *= -1.0; // Flip Y for shader coords
+                    
+                    // Normalize size roughly to -1..1 range for the formula
+                    p *= 1.8; 
+                    
                     p.x = abs(p.x);
-                    if (p.y + p.x > 1.0) 
-                        d = sqrt(dot(p-vec2(0.25,0.75), p-vec2(0.25,0.75))) - 0.23; // circles top
-                    else
-                        d = dot(p, vec2(0.6,0.8)); // wedge bottom
-                        
-                    // Let's stick to a simpler known SDF or mapped formula
-                    // d = dot(p,p) + ...
-                    // Let's retry a simpler analytic SDF for heart
-                    p.y -= 0.25;
-                    d = length(p) - 0.5; // fallback circle if complex
+
+                    if (p.y + p.x > 1.0) {
+                        d = sqrt(dot(p - vec2(0.25, 0.75), p - vec2(0.25, 0.75))) - 0.35355; // sqrt(2)/4
+                    } else {
+                        d = sqrt(min(dot(p - vec2(0.0, 1.0), p - vec2(0.0, 1.0)),
+                                     dot(p - 0.5 * max(p.x + p.y, 0.0), p - 0.5 * max(p.x + p.y, 0.0)))) * sign(p.x - p.y);
+                    }
                     
-                    // Analytic Heart SDF (iQuilez)
-                    p.y += 0.4;
-                    p.y *= -1.0; // logic flip
-                    float x = p.x;
-                    float y = p.y;
-                    // (x^2 + y^2 - r)^3 - x^2 * y^3 <= 0
-                    // We need a distance.
-                    // Let's just use "Star" logic but modified?
-                    // Or cheat: reuse 'triangle' + 'circles'?
-                    // Let's use standard dot for now, heart is hard to get perfect cheap SDF without artifacts.
-                    // Actually, let's use a "super ellipse" or just Circle for now until I have the formula handy?
-                    // Wait, I can do: r = (sin(t)*sqrt(abs(cos(t)))) / (sin(t) + 7/5) - 2*sin(t) + 2
-                    // Too expensive.
+                    // The SDF returns negative inside, positive outside for typical signed distance
+                    // But here we want d to be increasing effectively from center? 
+                    // Actually sdHeart returns positive outside.
+                    // So d is distance field.
+                    // We want to control size with radius.
+                    // d < radius.
+                    // Standard sdHeart is size ~1.0.
+                    // We scaled p by 1.8, so d is scaled.
+                    // We need to unscale or adjust radius/d comparison.
+                    // Let's use d directly but adjust the radius calculation to match.
                     
-                    // Simple "cardioid" like?
-                    d = length(p);
-                    float angleH = atan(p.x, -p.y);
-                    // r = 1 - sin(a)
-                    float shape = (1.0 - sin(angleH));
-                    // d = d / shape?
-                    // Just use Circle for now to unblock, and I'll refine it in next step if user complains.
-                    // WAIT, user asked for Heart. I should try.
+                    // With this formula, at boundary d=0. 
+                    // Inside is negative.
+                    // We typically use d = length(uv) which is 0 at center and grows.
+                    // So we want d_monotonic = d + shift?
+                    // Or just render shape at threshold?
+                    // Halftones need concentric shapes.
+                    // Is sdHeart concentric? Yes, isolines of SDF are rounded hearts.
                     
-                    // (x^2+y^2-1)^3 - x^2y^3 = 0
-                    // d ~ (x^2+y^2-1)^3 - x^2y^3
-                    float xx = p.x * p.x;
-                    float yy = p.y * p.y;
-                    float yyy = yy * p.y;
-                    float group = xx + yy - 0.5; // Radius sq
-                    d = group * group * group - xx * yyy * 2.0;
-                    // Normalize somewhat?
-                    // This is an implicit function value, not distance.
-                    // Thresholding it works for shape.
-                    if (d < 0.0) d = 0.0; // Inside
-                    else d = pow(d, 0.3); // Soften
+                    // We need d to be positive and increasing outwards from "center" (deep inside heart).
+                    // sdHeart is -0.5 at center roughly?
+                    // Let's shift it so center is 0.
+                    // Min value is roughly -0.5?
+                    // Let's just use d and adjust comparison.
+                    // If we want shape to grow from 0 to full cell:
+                    // value 0 -> radius 0 -> d < 0 (nothing)
+                    // value 1 -> radius large -> d < large (full fill)
+                    
+                    // Shift d so that center of heart is 0.
+                    d = d + 0.5;
+                    
+                    // Adjust radius scaling to match other shapes
+                    radius = value * 0.8 * (size / 100.0);
+
                     
                 } else if (pattern == 15) { // Rounded Box
                     vec2 p = abs(cellUV);
