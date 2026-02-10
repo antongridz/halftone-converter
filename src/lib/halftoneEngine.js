@@ -38,6 +38,7 @@ export class HalftoneEngine {
         `;
 
         const fragmentShaderSource = `
+            #extension GL_OES_standard_derivatives : enable
             precision highp float;
             
             uniform sampler2D u_image;
@@ -75,20 +76,81 @@ export class HalftoneEngine {
                 if (ch == 2) return cmyk.z;
                 return cmyk.w;
             }
+
+            float getGridValue(vec2 uv, int channel) {
+                 vec4 texColor = texture2D(u_image, uv);
+                 vec4 cmyk = rgb2cmyk(texColor.rgb);
+                 return getChannel(cmyk, channel);
+            }
+
+            float aastep(float threshold, float value) {
+                #ifdef GL_OES_standard_derivatives
+                    float afwidth = fwidth(value) * 0.5;
+                    return smoothstep(threshold - afwidth, threshold + afwidth, value);
+                #else
+                    return smoothstep(threshold - 0.03, threshold + 0.03, value);
+                #endif
+            }
             
             float halftone(vec2 uv, float value, float freq, float size, float angle, int pattern) {
                 float cellSize = u_resolution.x / freq;
                 vec2 center = u_resolution * 0.5;
+                
+                // Rotation
+                float rad = angle * PI / 180.0;
+                mat2 rot = rotate2d(rad);
+                mat2 invRot = rotate2d(-rad);
+                
                 vec2 pos = uv * u_resolution - center;
-                pos = rotate2d(angle * PI / 180.0) * pos;
+                pos = rot * pos;
                 pos += center;
                 
                 vec2 cell = floor(pos / cellSize);
                 vec2 cellCenter = (cell + 0.5) * cellSize;
                 vec2 cellUV = (pos - cellCenter) / cellSize;
                 
+                // Gooey (Metaballs)
+                if (pattern == 12) {
+                    float sum = 0.0;
+                    for (int y = -1; y <= 1; y++) {
+                        for (int x = -1; x <= 1; x++) {
+                            vec2 neighborCell = cell + vec2(float(x), float(y));
+                            vec2 neighborPos = (neighborCell + 0.5) * cellSize;
+                            
+                            // Transform back to UV space to sample image intensity
+                            vec2 unrotated = invRot * (neighborPos - center) + center;
+                            vec2 neighborSampleUV = unrotated / u_resolution;
+                            
+                            // Clamp UV
+                            neighborSampleUV = clamp(neighborSampleUV, 0.0, 1.0);
+                            
+                            float val = getGridValue(neighborSampleUV, u_channel);
+                            float radius = sqrt(val) * 0.5 * cellSize * (size / 100.0);
+                            
+                            float dist = length(pos - neighborPos);
+                            
+                            // Metaball function: R / dist
+                            // We act as if "threshold" is 1.0
+                            if (dist < 0.001) dist = 0.001; // Avoid div by zero
+                            
+                            // Use Gaussian-ish falloff for smoother merge? 
+                            // Or standard metaball 1/r. Standard 1/r is easiest but infinite.
+                            // Let's use R / dist.
+                            sum += (radius / dist);
+                        }
+                    }
+                    // Threshold at 1.0
+                    // Apply smoothstep for AA
+                    // The 'value' field is 'sum'. We want edges where sum = 1.0.
+                    // So we pass 'sum' to aastep with threshold 1.0.
+                    // Invert because standard logic returns 1.0 for "dark" (ink), 
+                    // and here high sum means "close to center" i.e. ink.
+                    // aastep(threshold, value) -> 0 if val < thresh, 1 if val > thresh.
+                    return aastep(1.0, sum);
+                }
+
+                // Standard Patterns
                 float radius = sqrt(value) * 0.5 * (size / 100.0);
-                
                 float d;
                 if (pattern == 0) { // Circle
                     d = length(cellUV);
@@ -131,10 +193,26 @@ export class HalftoneEngine {
                     d = length(subCell) * 2.0;
                 }
                 
-                return 1.0 - smoothstep(radius - 0.03, radius + 0.03, d);
+                // AA Step
+                // We want ink when d < radius.
+                // smoothstep(radius - w, radius + w, d) returns 0 if d < r-w, 1 if d > r+w.
+                // So this returns 0 "inside" (ink), 1 "outside" (paper).
+                // We want 1.0 for ink.
+                
+                #ifdef GL_OES_standard_derivatives
+                    float afwidth = fwidth(d) * 1.0; 
+                    // Use slightly wider AA for softer look or 0.7 for sharp
+                    return 1.0 - smoothstep(radius - afwidth, radius + afwidth, d);
+                #else
+                    return 1.0 - smoothstep(radius - 0.03, radius + 0.03, d);
+                #endif
             }
             
             void main() {
+                // Reuse logic inside halftone to fetch value if needed, or pass current
+                // Standard path passes 'channelValue' which is current pixel
+                // But for Gooey we ignore 'value' arg and sample neighbors.
+                
                 vec4 texColor = texture2D(u_image, v_texCoord);
                 vec4 cmyk = rgb2cmyk(texColor.rgb);
                 float channelValue = getChannel(cmyk, u_channel);
@@ -248,7 +326,7 @@ export class HalftoneEngine {
     }
 
     getPatternIndex(patternName) {
-        const patterns = ['circle', 'square', 'diamond', 'ellipse', 'line', 'cross', 'star', 'triangle', 'hex', 'ring', 'wave', 'dot-grid'];
+        const patterns = ['circle', 'square', 'diamond', 'ellipse', 'line', 'cross', 'star', 'triangle', 'hex', 'ring', 'wave', 'dot-grid', 'gooey'];
         return patterns.indexOf(patternName);
     }
 
@@ -586,6 +664,18 @@ export class HalftoneEngine {
                     pts.push(`${(x + r * Math.cos(i * Math.PI / 3)).toFixed(1)},${(y + r * Math.sin(i * Math.PI / 3)).toFixed(1)}`);
                 }
                 return `    <polygon points="${pts.join(' ')}"/>\n`;
+            case 'dot-grid':
+                const s = r * 0.4;
+                // Simplified dot grid for SVG
+                return `    <circle cx="${(x - s).toFixed(1)}" cy="${(y - s).toFixed(1)}" r="${s.toFixed(1)}"/>
+                            <circle cx="${(x + s).toFixed(1)}" cy="${(y - s).toFixed(1)}" r="${s.toFixed(1)}"/>
+                            <circle cx="${(x - s).toFixed(1)}" cy="${(y + s).toFixed(1)}" r="${s.toFixed(1)}"/>
+                            <circle cx="${(x + s).toFixed(1)}" cy="${(y + s).toFixed(1)}" r="${s.toFixed(1)}"/>\n`;
+            case 'gooey':
+                // Gooey in SVG is hard (metaballs). Fallback to circle for now?
+                // Or maybe a slightly larger circle?
+                // "Gooey" is essentially liquid circles.
+                return `    <circle cx="${xf}" cy="${yf}" r="${rf}"/>\n`;
             default:
                 return `    <circle cx="${xf}" cy="${yf}" r="${rf}"/>\n`;
         }
