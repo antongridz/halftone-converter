@@ -127,9 +127,11 @@ export class HalftoneEngine {
                 // Gooey (Metaballs)
                 if (pattern == 12) {
                     float sum = 0.0;
-                    // Increase kernel to 5x5 to avoid clipping artifacts at cell boundaries
-                    for (int y = -2; y <= 2; y++) {
-                        for (int x = -2; x <= 2; x++) {
+                    // Increase kernel to 7x7 (radius 3) to allow for smoother falloff without clipping
+                    // At boundary (dist 0.5 from center), the neighbor at index -3 is at dist 3.0.
+                    // So we can support a window up to size ~3.0.
+                    for (int y = -3; y <= 3; y++) {
+                        for (int x = -3; x <= 3; x++) {
                             vec2 neighborCell = cell + vec2(float(x), float(y));
                             vec2 neighborPos = (neighborCell + 0.5) * cellSize;
                             
@@ -138,22 +140,21 @@ export class HalftoneEngine {
                             neighborSampleUV = clamp(neighborSampleUV, 0.0, 1.0);
                             
                             float val = getChannelValue(neighborSampleUV, u_channel);
+                            // Increase base influence slightly to account for windowing
                             float radius = sqrt(val) * 0.5 * cellSize * (size / 100.0);
                             
                             float dist = length(pos - neighborPos);
-                            // But then they won't merge more than circles?
-                            // Actually, (R/d)^2 adds up. 
-                            // midpoint between two R dots at distance 2R (touching): 
-                            // Sum = 1/(1)^2 + 1/(1)^2 = 2.
-                            // So at touching point, value is 2. (Single dot edge is 1).
-                            // This means the "neck" will be wider.
+                            if (dist < 0.001) dist = 0.001;
                             
-                            // Let's use simple R/d but with a threshold adjustment?
-                            // Or just boost the radius influence but threshold higher?
-                            // No, let's keep it simple.
-                            // sum += (radius * 1.5 / dist) ^ 2
+                            // Windowing function
+                            // Must reach 0 before dist = 3.0 (cell size units)
+                            float maxDist = cellSize * 2.9; // Safe margin under 3.0
+                            // Smooth falloff from 1.5 to 2.9
+                            float window = smoothstep(maxDist, maxDist * 0.5, dist);
                             
                             float influence = (radius * 1.5) / dist;
+                            influence *= window;
+                            
                             sum += influence * influence;
                         }
                     }
