@@ -214,7 +214,6 @@ export class HalftoneEngine {
                     d = abs(cellUV.y - wave * 2.0 * amp * 2.0); // Simple zigzag
                     radius = value * 0.35 * (size / 100.0);
                 } else if (pattern == 14) { // Heart
-                } else if (pattern == 14) { // Heart
                     vec2 p = cellUV;
                     p.y += 0.35; // Shift to center the heart (visually)
                     // Standard SDF has tip at -1.0, lobes around +0.6. 
