@@ -204,9 +204,6 @@ export class HalftoneEngine {
                 } else if (pattern == 10) { // Wave
                     d = abs(cellUV.y - sin(cellUV.x * 6.28) * 0.15);
                     radius = value * 0.35 * (size / 100.0);
-                } else if (pattern == 10) { // Wave
-                    d = abs(cellUV.y - sin(cellUV.x * 6.28) * 0.15);
-                    radius = value * 0.35 * (size / 100.0);
                 } else if (pattern == 11) { // Dot grid
                     vec2 subCell = fract(cellUV * 2.0 + 0.5) - 0.5;
                     d = length(subCell) * 2.0;
