@@ -49,6 +49,8 @@ export class HalftoneEngine {
             uniform int u_pattern;
             uniform vec3 u_color;
             uniform int u_channel;
+            uniform int u_colorMode;
+            uniform int u_totalColors;
             
             varying vec2 v_texCoord;
             
@@ -77,8 +79,21 @@ export class HalftoneEngine {
                 return cmyk.w;
             }
 
-            float getGridValue(vec2 uv, int channel) {
+            float getChannelValue(vec2 uv, int channel) {
                  vec4 texColor = texture2D(u_image, uv);
+                 
+                 if (u_colorMode == 2) {
+                     float lum = 0.299 * texColor.r + 0.587 * texColor.g + 0.114 * texColor.b;
+                     if (u_totalColors == 2) {
+                        if (channel == 0) return pow(1.0 - lum, 1.2) * 0.8;
+                        else return lum * 0.6;
+                     } else {
+                        if (channel == 0) return max(0.0, (0.4 - lum) * 2.5);
+                        else if (channel == 1) return max(0.0, 1.0 - abs(lum - 0.5) * 2.5);
+                        else return max(0.0, (lum - 0.6) * 2.5);
+                     }
+                 }
+                 
                  vec4 cmyk = rgb2cmyk(texColor.rgb);
                  return getChannel(cmyk, channel);
             }
@@ -124,7 +139,7 @@ export class HalftoneEngine {
                             // Clamp UV
                             neighborSampleUV = clamp(neighborSampleUV, 0.0, 1.0);
                             
-                            float val = getGridValue(neighborSampleUV, u_channel);
+                            float val = getChannelValue(neighborSampleUV, u_channel);
                             float radius = sqrt(val) * 0.5 * cellSize * (size / 100.0);
                             
                             float dist = length(pos - neighborPos);
@@ -224,14 +239,7 @@ export class HalftoneEngine {
             }
             
             void main() {
-                // Reuse logic inside halftone to fetch value if needed, or pass current
-                // Standard path passes 'channelValue' which is current pixel
-                // But for Gooey we ignore 'value' arg and sample neighbors.
-                
-                vec4 texColor = texture2D(u_image, v_texCoord);
-                vec4 cmyk = rgb2cmyk(texColor.rgb);
-                float channelValue = getChannel(cmyk, u_channel);
-                
+                float channelValue = getChannelValue(v_texCoord, u_channel);
                 float h = halftone(v_texCoord, channelValue, u_frequency, u_dotSize, u_angle, u_pattern);
                 
                 gl_FragColor = vec4(u_color, h);
@@ -374,9 +382,8 @@ export class HalftoneEngine {
             const hex = settings.customColors[i];
             const rgb = this.hexToRgb(hex);
             const ch = Object.values(settings.channels)[i];
-            // Custom colors use CPU rendering in original code, but we can try to adapt to GL later.
-            // Original code used renderCustomChannelCanvas (CPU). Let's implement that too.
-            this.renderCustomChannelCanvas(i, numColors, angles[i], ch.size, ch.frequency, rgb, settings.pattern);
+
+            this.renderChannelGL(i, angles[i], ch.size, ch.frequency, rgb, settings.pattern, 2, numColors);
         }
     }
 
@@ -389,7 +396,7 @@ export class HalftoneEngine {
         ] : [0, 0, 0];
     }
 
-    renderChannelGL(channelIndex, angle, size, frequency, color, pattern) {
+    renderChannelGL(channelIndex, angle, size, frequency, color, pattern, colorMode = 0, totalColors = 0) {
         this.gl.useProgram(this.program);
 
         this.gl.uniform2f(this.gl.getUniformLocation(this.program, 'u_resolution'), this.glCanvas.width, this.glCanvas.height);
@@ -399,6 +406,8 @@ export class HalftoneEngine {
         this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_pattern'), this.getPatternIndex(pattern));
         this.gl.uniform3f(this.gl.getUniformLocation(this.program, 'u_color'), color[0], color[1], color[2]);
         this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_channel'), channelIndex);
+        this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_colorMode'), colorMode);
+        this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_totalColors'), totalColors);
 
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.sourceTexture);
         this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
