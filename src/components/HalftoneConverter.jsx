@@ -21,6 +21,17 @@ export default function HalftoneConverter() {
     const [transparentBg, setTransparentBg] = useState(false);
     const [exportFormat, setExportFormat] = useState('png');
 
+    const [collapsed, setCollapsed] = useState({
+        pattern: false,
+        presets: false,
+        color: false,
+        global: false
+    });
+
+    const toggleSection = (section) => {
+        setCollapsed(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
     const [settings, setSettings] = useState({
         pattern: 'circle',
         colorMode: 'cmyk',
@@ -336,8 +347,13 @@ export default function HalftoneConverter() {
 
                     {/* Patterns */}
                     <div className="section">
-                        <div className="section-header">Dot Pattern</div>
-                        <div className="section-content">
+                        <div
+                            className={`section-header collapsible ${collapsed.pattern ? 'collapsed' : ''}`}
+                            onClick={() => toggleSection('pattern')}
+                        >
+                            Dot Pattern
+                        </div>
+                        <div className={`section-content ${collapsed.pattern ? 'collapsed' : ''}`}>
                             <div className="pattern-grid">
                                 {['circle', 'square', 'diamond', 'ellipse', 'line', 'cross', 'star', 'triangle', 'hex', 'ring', 'wave', 'dot-grid'].map(p => (
                                     <button
@@ -355,8 +371,13 @@ export default function HalftoneConverter() {
 
                     {/* Presets */}
                     <div className="section">
-                        <div className="section-header">Presets</div>
-                        <div className="section-content">
+                        <div
+                            className={`section-header collapsible ${collapsed.presets ? 'collapsed' : ''}`}
+                            onClick={() => toggleSection('presets')}
+                        >
+                            Presets
+                        </div>
+                        <div className={`section-content ${collapsed.presets ? 'collapsed' : ''}`}>
                             <div className="presets-grid">
                                 {Object.keys(PRESETS).map(preset => (
                                     <button
@@ -373,8 +394,13 @@ export default function HalftoneConverter() {
 
                     {/* Color Mode */}
                     <div className="section">
-                        <div className="section-header">Color Separation</div>
-                        <div className="section-content">
+                        <div
+                            className={`section-header collapsible ${collapsed.color ? 'collapsed' : ''}`}
+                            onClick={() => toggleSection('color')}
+                        >
+                            Color Separation
+                        </div>
+                        <div className={`section-content ${collapsed.color ? 'collapsed' : ''}`}>
                             <div className="color-mode-tabs">
                                 {['cmyk', 'duotone', 'tritone', 'mono'].map(mode => (
                                     <button
@@ -459,8 +485,13 @@ export default function HalftoneConverter() {
 
                     {/* Global Settings */}
                     <div className="section">
-                        <div className="section-header">Global Controls</div>
-                        <div className="section-content">
+                        <div
+                            className={`section-header collapsible ${collapsed.global ? 'collapsed' : ''}`}
+                            onClick={() => toggleSection('global')}
+                        >
+                            Global Controls
+                        </div>
+                        <div className={`section-content ${collapsed.global ? 'collapsed' : ''}`}>
                             <div className="global-control">
                                 <div className="control-row">
                                     <span className="slider-label">Frequency (LPI)</span>
