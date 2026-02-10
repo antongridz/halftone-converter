@@ -6,27 +6,27 @@ export class HalftoneEngine {
         this.beforeCanvas = canvases.before; // Can be null if not used directly
         this.afterCanvas = canvases.after;   // Can be null if not used directly
         this.glCanvas = document.createElement('canvas'); // Offscreen for WebGL processing
-        
+
         this.sourceCtx = this.sourceCanvas.getContext('2d');
         this.halftoneCtx = this.halftoneCanvas.getContext('2d');
-        
+
         this.gl = null;
         this.program = null;
         this.sourceTexture = null;
-        
+
         this.initWebGL();
     }
-    
+
     initWebGL() {
         // Try getting WebGL context from the offscreen canvas
-        this.gl = this.glCanvas.getContext('webgl', { preserveDrawingBuffer: true }) || 
-                  this.glCanvas.getContext('experimental-webgl', { preserveDrawingBuffer: true });
-        
+        this.gl = this.glCanvas.getContext('webgl', { preserveDrawingBuffer: true }) ||
+            this.glCanvas.getContext('experimental-webgl', { preserveDrawingBuffer: true });
+
         if (!this.gl) {
             console.warn('WebGL not supported');
             return;
         }
-        
+
         const vertexShaderSource = `
             attribute vec2 a_position;
             attribute vec2 a_texCoord;
@@ -36,7 +36,7 @@ export class HalftoneEngine {
                 v_texCoord = a_texCoord;
             }
         `;
-        
+
         const fragmentShaderSource = `
             precision highp float;
             
@@ -144,45 +144,45 @@ export class HalftoneEngine {
                 gl_FragColor = vec4(u_color, h);
             }
         `;
-        
+
         const vertexShader = this.compileShader(this.gl.VERTEX_SHADER, vertexShaderSource);
         const fragmentShader = this.compileShader(this.gl.FRAGMENT_SHADER, fragmentShaderSource);
-        
+
         this.program = this.gl.createProgram();
         this.gl.attachShader(this.program, vertexShader);
         this.gl.attachShader(this.program, fragmentShader);
         this.gl.linkProgram(this.program);
-        
+
         if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
             console.error('Program link error:', this.gl.getProgramInfoLog(this.program));
         }
-        
+
         const positionBuffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, positionBuffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([
             -1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1
         ]), this.gl.STATIC_DRAW);
-        
+
         const positionLocation = this.gl.getAttribLocation(this.program, 'a_position');
         this.gl.enableVertexAttribArray(positionLocation);
         this.gl.vertexAttribPointer(positionLocation, 2, this.gl.FLOAT, false, 0, 0);
-        
+
         const texCoordBuffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, texCoordBuffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([
             0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0
         ]), this.gl.STATIC_DRAW);
-        
+
         const texCoordLocation = this.gl.getAttribLocation(this.program, 'a_texCoord');
         this.gl.enableVertexAttribArray(texCoordLocation);
         this.gl.vertexAttribPointer(texCoordLocation, 2, this.gl.FLOAT, false, 0, 0);
     }
-    
+
     compileShader(type, source) {
         const shader = this.gl.createShader(type);
         this.gl.shaderSource(shader, source);
         this.gl.compileShader(shader);
-        
+
         if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
             console.error('Shader error:', this.gl.getShaderInfoLog(shader));
             this.gl.deleteShader(shader);
@@ -196,22 +196,22 @@ export class HalftoneEngine {
         this.sourceCanvas.width = img.width;
         this.sourceCanvas.height = img.height;
         this.sourceCtx.drawImage(img, 0, 0);
-        
+
         this.halftoneCanvas.width = img.width;
         this.halftoneCanvas.height = img.height;
-        
+
         this.glCanvas.width = img.width;
         this.glCanvas.height = img.height;
-        
+
         this.setupTexture();
         this.imageLoaded = true;
     }
-    
+
     setupTexture() {
         this.gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
-        
+
         if (this.sourceTexture) this.gl.deleteTexture(this.sourceTexture);
-        
+
         this.sourceTexture = this.gl.createTexture();
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.sourceTexture);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
@@ -223,10 +223,10 @@ export class HalftoneEngine {
 
     render(settings) {
         if (!this.imageLoaded || !this.program) return;
-        
+
         const width = this.sourceCanvas.width;
         const height = this.sourceCanvas.height;
-        
+
         // Clear canvas
         if (settings.transparentBg) {
             this.halftoneCtx.clearRect(0, 0, width, height);
@@ -234,7 +234,7 @@ export class HalftoneEngine {
             this.halftoneCtx.fillStyle = '#f4f1ea'; // cream color
             this.halftoneCtx.fillRect(0, 0, width, height);
         }
-        
+
         if (settings.colorMode === 'cmyk') {
             this.renderCMYK(settings);
         } else if (settings.colorMode === 'mono') {
@@ -260,23 +260,23 @@ export class HalftoneEngine {
             yellow: [1, 0.949, 0],
             key: [0.137, 0.122, 0.125]
         };
-        
+
         channels.forEach((channel, index) => {
             const ch = settings.channels[channel];
             if (!ch.enabled) return;
             this.renderChannelGL(index, ch.angle, ch.size, ch.frequency, colors[channel], settings.pattern);
         });
     }
-    
+
     renderMono(settings) {
         const ch = settings.channels.key;
         this.renderChannelGL(3, ch.angle, ch.size, ch.frequency, [0.137, 0.122, 0.125], settings.pattern);
     }
-    
+
     renderCustomColors(settings) {
         const numColors = settings.colorMode === 'duotone' ? 2 : 3;
         const angles = [15, 75, 45];
-        
+
         for (let i = 0; i < numColors; i++) {
             const hex = settings.customColors[i];
             const rgb = this.hexToRgb(hex);
@@ -298,7 +298,7 @@ export class HalftoneEngine {
 
     renderChannelGL(channelIndex, angle, size, frequency, color, pattern) {
         this.gl.useProgram(this.program);
-        
+
         this.gl.uniform2f(this.gl.getUniformLocation(this.program, 'u_resolution'), this.glCanvas.width, this.glCanvas.height);
         this.gl.uniform1f(this.gl.getUniformLocation(this.program, 'u_frequency'), frequency);
         this.gl.uniform1f(this.gl.getUniformLocation(this.program, 'u_dotSize'), size);
@@ -306,20 +306,20 @@ export class HalftoneEngine {
         this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_pattern'), this.getPatternIndex(pattern));
         this.gl.uniform3f(this.gl.getUniformLocation(this.program, 'u_color'), color[0], color[1], color[2]);
         this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_channel'), channelIndex);
-        
+
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.sourceTexture);
         this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
-        
+
         const pixels = new Uint8Array(this.glCanvas.width * this.glCanvas.height * 4);
         this.gl.readPixels(0, 0, this.glCanvas.width, this.glCanvas.height, this.gl.RGBA, this.gl.UNSIGNED_BYTE, pixels);
-        
+
         // Flip Y and composite
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = this.glCanvas.width;
         tempCanvas.height = this.glCanvas.height;
         const tempCtx = tempCanvas.getContext('2d');
         const imageData = tempCtx.createImageData(this.glCanvas.width, this.glCanvas.height);
-        
+
         // Optimized loop for flipping Y
         const w = this.glCanvas.width;
         const h = this.glCanvas.height;
@@ -327,52 +327,52 @@ export class HalftoneEngine {
             const srcRow = y * w * 4;
             const dstRow = (h - 1 - y) * w * 4;
             // Copy row
-            for(let x=0; x < w * 4; x++) {
+            for (let x = 0; x < w * 4; x++) {
                 imageData.data[dstRow + x] = pixels[srcRow + x];
             }
         }
-        
+
         tempCtx.putImageData(imageData, 0, 0);
-        
+
         this.halftoneCtx.globalCompositeOperation = 'multiply';
         this.halftoneCtx.drawImage(tempCanvas, 0, 0);
         this.halftoneCtx.globalCompositeOperation = 'source-over';
     }
 
     renderCustomChannelCanvas(colorIndex, totalColors, angle, size, frequency, rgb, pattern) {
-         // CPU implementation from original code
+        // CPU implementation from original code
         const width = this.halftoneCanvas.width;
         const height = this.halftoneCanvas.height;
         const imageData = this.sourceCtx.getImageData(0, 0, width, height).data;
-        
+
         const cellSize = Math.max(2, Math.round(width / frequency));
         const angleRad = angle * Math.PI / 180;
         const diagonal = Math.sqrt(width * width + height * height);
         const centerX = width / 2;
         const centerY = height / 2;
-        
+
         this.halftoneCtx.fillStyle = `rgb(${Math.round(rgb[0] * 255)}, ${Math.round(rgb[1] * 255)}, ${Math.round(rgb[2] * 255)})`;
-        
+
         // Using smaller step or just implementing the loop as is
         // NOTE: This might be slow in JS without WebGL.
         // Original code was CPU based for custom colors? Yes.
-        
+
         for (let gy = -diagonal / 2; gy < diagonal / 2; gy += cellSize) {
             for (let gx = -diagonal / 2; gx < diagonal / 2; gx += cellSize) {
                 const rx = gx * Math.cos(angleRad) - gy * Math.sin(angleRad) + centerX;
                 const ry = gx * Math.sin(angleRad) + gy * Math.cos(angleRad) + centerY;
-                
+
                 if (rx < 0 || rx >= width || ry < 0 || ry >= height) continue;
-                
+
                 const px = Math.floor(rx);
                 const py = Math.floor(ry);
                 const idx = (py * width + px) * 4;
-                
+
                 const r = imageData[idx] / 255;
                 const g = imageData[idx + 1] / 255;
                 const b = imageData[idx + 2] / 255;
                 const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-                
+
                 let intensity = 0;
                 if (totalColors === 2) {
                     intensity = colorIndex === 0 ? Math.pow(1 - lum, 1.2) * 0.8 : lum * 0.6;
@@ -381,11 +381,11 @@ export class HalftoneEngine {
                     else if (colorIndex === 1) intensity = Math.max(0, 1 - Math.abs(lum - 0.5) * 2.5);
                     else intensity = Math.max(0, (lum - 0.6) * 2.5);
                 }
-                
+
                 if (intensity < 0.02) continue;
-                
+
                 const dotRadius = cellSize * 0.5 * Math.sqrt(intensity) * (size / 100);
-                
+
                 this.halftoneCtx.beginPath();
                 this.drawPatternShape(rx, ry, dotRadius, cellSize, angleRad, pattern);
                 this.halftoneCtx.fill();
@@ -395,7 +395,7 @@ export class HalftoneEngine {
 
     drawPatternShape(x, y, radius, cellSize, angle, pattern) {
         const ctx = this.halftoneCtx;
-        
+
         switch (pattern) {
             case 'circle':
                 ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -450,11 +450,11 @@ export class HalftoneEngine {
                 ctx.arc(x, y, radius, 0, Math.PI * 2);
         }
     }
-    
+
     drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
         let rot = Math.PI / 2 * 3;
         let step = Math.PI / spikes;
-        
+
         ctx.moveTo(cx, cy - outerRadius);
         for (let i = 0; i < spikes; i++) {
             ctx.lineTo(cx + Math.cos(rot) * outerRadius, cy + Math.sin(rot) * outerRadius);
@@ -465,7 +465,7 @@ export class HalftoneEngine {
         ctx.lineTo(cx, cy - outerRadius);
         ctx.closePath();
     }
-    
+
     drawPolygon(ctx, cx, cy, radius, sides) {
         ctx.moveTo(cx + radius * Math.cos(0), cy + radius * Math.sin(0));
         for (let i = 1; i <= sides; i++) {
@@ -475,20 +475,111 @@ export class HalftoneEngine {
     }
 
     // Export helpers
+    generateSVG(settings) {
+        if (!this.sourceCanvas) return '';
+
+        const width = this.sourceCanvas.width;
+        const height = this.sourceCanvas.height;
+        const imageData = this.sourceCtx.getImageData(0, 0, width, height).data;
+
+        let svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n`;
+
+        if (!settings.transparentBg) {
+            svg += `  <rect width="${width}" height="${height}" fill="#f4f1ea"/>\n`;
+        }
+
+        // Determine channels to export
+        let channels = [];
+        if (settings.colorMode === 'cmyk') {
+            channels = ['cyan', 'magenta', 'yellow', 'key'];
+        } else if (settings.colorMode === 'mono') {
+            channels = ['key'];
+        } else {
+            // Custom colors not fully supported in SVG export in legacy, but we can try mapping them
+            // Legacy code only did CMYK/Mono for SVG loop. 
+            // If custom mode, let's skip or treat as mono?
+            // "The legacy code probably did something specific." 
+            // Looking at legacy code:
+            // const channels = this.settings.colorMode === 'cmyk' ? ['cyan'...] : this.settings.colorMode === 'mono' ? ['key'] : [];
+            // So custom colors yielded empty array -> no SVG output for custom colors.
+            // I will maintain this behavior for now to match legacy fidelity.
+            channels = [];
+        }
+
+        const colors = { cyan: '#00aeef', magenta: '#ec008c', yellow: '#fff200', key: '#231f20' };
+
+        channels.forEach((channel) => {
+            const ch = settings.channels[channel];
+            if (!ch.enabled) return;
+
+            svg += `  <g fill="${colors[channel]}" opacity="0.85">\n`;
+
+            const cellSize = Math.max(2, Math.round(width / ch.frequency));
+            const angleRad = ch.angle * Math.PI / 180;
+            const diagonal = Math.sqrt(width * width + height * height);
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            // Loop for dots
+            for (let gy = -diagonal / 2; gy < diagonal / 2; gy += cellSize) {
+                for (let gx = -diagonal / 2; gx < diagonal / 2; gx += cellSize) {
+                    const rx = gx * Math.cos(angleRad) - gy * Math.sin(angleRad) + centerX;
+                    const ry = gx * Math.sin(angleRad) + gy * Math.cos(angleRad) + centerY;
+
+                    if (rx < 0 || rx >= width || ry < 0 || ry >= height) continue;
+
+                    const px = Math.floor(rx);
+                    const py = Math.floor(ry);
+                    const idx = (py * width + px) * 4;
+
+                    const r = imageData[idx] / 255;
+                    const g = imageData[idx + 1] / 255;
+                    const b = imageData[idx + 2] / 255;
+
+                    const k = 1 - Math.max(r, g, b);
+                    let intensity = 0;
+
+                    if (k < 0.999) {
+                        const invK = 1 / (1 - k);
+                        if (channel === 'cyan') intensity = (1 - r - k) * invK;
+                        else if (channel === 'magenta') intensity = (1 - g - k) * invK;
+                        else if (channel === 'yellow') intensity = (1 - b - k) * invK;
+                        else intensity = k;
+                    } else {
+                        // Pure black
+                        intensity = channel === 'key' ? 1 : 0;
+                    }
+
+                    intensity = Math.max(0, Math.min(1, intensity));
+                    if (intensity < 0.02) continue;
+
+                    const dotRadius = cellSize * 0.5 * Math.sqrt(intensity) * (ch.size / 100);
+                    svg += this.getSVGShape(rx, ry, dotRadius, ch.angle, settings.pattern);
+                }
+            }
+
+            svg += `  </g>\n`;
+        });
+
+        svg += '</svg>';
+        return svg;
+    }
+
+
     getSVGShape(x, y, r, angle, pattern) {
         const xf = x.toFixed(1);
         const yf = y.toFixed(1);
         const rf = r.toFixed(1);
-        
+
         switch (pattern) {
             case 'circle':
                 return `    <circle cx="${xf}" cy="${yf}" r="${rf}"/>\n`;
             case 'square':
-                return `    <rect x="${(x-r).toFixed(1)}" y="${(y-r).toFixed(1)}" width="${(r*2).toFixed(1)}" height="${(r*2).toFixed(1)}"/>\n`;
+                return `    <rect x="${(x - r).toFixed(1)}" y="${(y - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}"/>\n`;
             case 'diamond':
-                return `    <rect x="${(x-r).toFixed(1)}" y="${(y-r).toFixed(1)}" width="${(r*2).toFixed(1)}" height="${(r*2).toFixed(1)}" transform="rotate(45 ${xf} ${yf})"/>\n`;
+                return `    <rect x="${(x - r).toFixed(1)}" y="${(y - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" transform="rotate(45 ${xf} ${yf})"/>\n`;
             case 'ellipse':
-                return `    <ellipse cx="${xf}" cy="${yf}" rx="${rf}" ry="${(r*0.6).toFixed(1)}" transform="rotate(${angle} ${xf} ${yf})"/>\n`;
+                return `    <ellipse cx="${xf}" cy="${yf}" rx="${rf}" ry="${(r * 0.6).toFixed(1)}" transform="rotate(${angle} ${xf} ${yf})"/>\n`;
             case 'hex':
                 const pts = [];
                 for (let i = 0; i < 6; i++) {

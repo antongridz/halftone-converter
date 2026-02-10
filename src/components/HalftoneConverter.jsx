@@ -279,16 +279,18 @@ export default function HalftoneConverter() {
             link.href = halftoneCanvasRef.current.toDataURL('image/png');
             link.click();
         } else if (exportFormat === 'svg') {
-            // Re-implement SVG export logic or call engine method if specific engine method existed
-            // Since engine logic was copied but exportSVG was part of HTML script...
-            // I need to add exportSVG to engine or here.
-            // I'll assume I should have added it to engine or implement it here.
-            // The engine has getSVGShape, but the loop was there.
-            // I'll implement a simplified version or I should have put it in engine. 
-            // To keep this file smaller, I'll rely on the engine having a helper or just implementing it here using setting.
-            // Since I didn't verify engine has exportSVG completely (I only saw render loop), I'll add `exportSVG` to engine or just copy logic here.
-            // The logic is complex to copy here (pixel reading).
-            alert('SVG/PDF Export not fully implemented in this port version yet.');
+            if (settings.colorMode !== 'cmyk' && settings.colorMode !== 'mono') {
+                alert('SVG export currently supports CMYK and Mono modes only.');
+                return;
+            }
+            const svgContent = engineRef.current.generateSVG(settings);
+            if (!svgContent) return;
+
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const link = document.createElement('a');
+            link.download = 'halftone-output.svg';
+            link.href = URL.createObjectURL(blob);
+            link.click();
         } else {
             // PDF
             const scale = 2;
