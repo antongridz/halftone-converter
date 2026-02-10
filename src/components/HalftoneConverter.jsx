@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { HalftoneEngine } from '../lib/halftoneEngine';
+import { jsPDF } from 'jspdf';
 
 export default function HalftoneConverter() {
     // Refs
@@ -293,17 +294,45 @@ export default function HalftoneConverter() {
             link.click();
         } else {
             // PDF
-            const scale = 2;
+            const scale = 2; // 2x for better quality
             const highResCanvas = document.createElement('canvas');
             highResCanvas.width = halftoneCanvasRef.current.width * scale;
             highResCanvas.height = halftoneCanvasRef.current.height * scale;
             const ctx = highResCanvas.getContext('2d');
+
+            // Fill background if not transparent
+            if (!settings.transparentBg) {
+                ctx.fillStyle = '#f4f1ea';
+                ctx.fillRect(0, 0, highResCanvas.width, highResCanvas.height);
+            }
+
             ctx.scale(scale, scale);
             ctx.drawImage(halftoneCanvasRef.current, 0, 0);
-            const link = document.createElement('a');
-            link.download = 'halftone-print-300dpi.png'; // It was PNG actually in original code for PDF button?
-            link.href = highResCanvas.toDataURL('image/png');
-            link.click();
+
+            const imgData = highResCanvas.toDataURL('image/png');
+
+            // Calculate PDF dimensions (A4 or match image aspect ratio?)
+            // Let's match image dimensions in points (72 dpi) but scaled to fit if too large?
+            // Actually, simplest is to make PDF size match image size converted to mm/points.
+            // Or use A4 and fit image.
+
+            const imgWidth = halftoneCanvasRef.current.width;
+            const imgHeight = halftoneCanvasRef.current.height;
+
+            // Create PDF with image dimensions (pixels -> points is 1:1 in jsPDF usually if unit is px, but let's use default mm)
+            // mm = px * 0.264583
+            const pxToMm = 0.264583;
+            const pdfWidth = imgWidth * pxToMm;
+            const pdfHeight = imgHeight * pxToMm;
+
+            const pdf = new jsPDF({
+                orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
+                unit: 'mm',
+                format: [pdfWidth, pdfHeight]
+            });
+
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save('halftone-output.pdf');
         }
     };
 
