@@ -386,7 +386,7 @@ export default function HalftoneConverter() {
                         </div>
                         <div className={`section-content ${collapsed.pattern ? 'collapsed' : ''}`}>
                             <div className="pattern-grid">
-                                {['circle', 'square', 'diamond', 'ellipse', 'line', 'cross', 'star', 'triangle', 'hex', 'ring', 'wave', 'dot-grid'].map(p => (
+                                {['circle', 'square', 'diamond', 'ellipse', 'line', 'cross', 'star', 'triangle', 'hex', 'ring', 'wave', 'dot-grid', 'gooey'].map(p => (
                                     <button
                                         key={p}
                                         className={`pattern-btn ${settings.pattern === p ? 'active' : ''}`}

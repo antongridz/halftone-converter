@@ -279,7 +279,7 @@ body {
     display: none;
 }
 
-/* Pattern Selector - 12 patterns in 4x3 grid */
+/* Pattern Selector - 13 patterns in flexible grid */
 .pattern-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
