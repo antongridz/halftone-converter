@@ -52,6 +52,45 @@ export default function HalftoneConverter() {
         offset: { pattern: 'circle', frequency: 55, size: 95, angles: { cyan: 18, magenta: 72, yellow: 3, key: 48 } }
     };
 
+    const PATTERN_ICONS = {
+        circle: <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="currentColor" /></svg>,
+        square: <svg viewBox="0 0 32 32"><rect x="6" y="6" width="20" height="20" fill="currentColor" /></svg>,
+        diamond: <svg viewBox="0 0 32 32"><rect x="8" y="8" width="16" height="16" fill="currentColor" transform="rotate(45 16 16)" /></svg>,
+        ellipse: <svg viewBox="0 0 32 32"><ellipse cx="16" cy="16" rx="12" ry="7" fill="currentColor" /></svg>,
+        line: (
+            <svg viewBox="0 0 32 32" fill="none">
+                <line x1="4" y1="10" x2="28" y2="10" stroke="currentColor" strokeWidth="4" />
+                <line x1="4" y1="22" x2="28" y2="22" stroke="currentColor" strokeWidth="4" />
+            </svg>
+        ),
+        cross: (
+            <svg viewBox="0 0 32 32" fill="currentColor">
+                <rect x="13" y="4" width="6" height="24" />
+                <rect x="4" y="13" width="24" height="6" />
+            </svg>
+        ),
+        star: <svg viewBox="0 0 32 32"><polygon points="16,4 19,12 28,12 21,18 24,28 16,22 8,28 11,18 4,12 13,12" fill="currentColor" /></svg>,
+        triangle: <svg viewBox="0 0 32 32"><polygon points="16,4 28,28 4,28" fill="currentColor" /></svg>,
+        hex: <svg viewBox="0 0 32 32"><polygon points="16,3 28,10 28,22 16,29 4,22 4,10" fill="currentColor" /></svg>,
+        ring: (
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="4">
+                <circle cx="16" cy="16" r="10" />
+            </svg>
+        ),
+        wave: (
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="3">
+                <path d="M2,16 Q8,8 16,16 T30,16" />
+            </svg>
+        ),
+        'dot-grid': (
+            <svg viewBox="0 0 32 32" fill="currentColor">
+                <circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" /><circle cx="24" cy="8" r="3" />
+                <circle cx="8" cy="16" r="3" /><circle cx="16" cy="16" r="3" /><circle cx="24" cy="16" r="3" />
+                <circle cx="8" cy="24" r="3" /><circle cx="16" cy="24" r="3" /><circle cx="24" cy="24" r="3" />
+            </svg>
+        )
+    };
+
     // Initialize Engine
     useEffect(() => {
         if (sourceCanvasRef.current && halftoneCanvasRef.current) {
@@ -306,10 +345,7 @@ export default function HalftoneConverter() {
                                         className={`pattern-btn ${settings.pattern === p ? 'active' : ''}`}
                                         onClick={() => setSettings(s => ({ ...s, pattern: p }))}
                                     >
-                                        <div style={{ width: 22, height: 22, background: 'currentColor', mask: 'url(...)' }}>
-                                            {/* Icons handled by SVGs in original. I'll use text for now or simple SVG placeholders */}
-                                            <span style={{ fontSize: 10 }}>{p.slice(0, 2)}</span>
-                                        </div>
+                                        {PATTERN_ICONS[p]}
                                         <span className="pattern-label">{p}</span>
                                     </button>
                                 ))}
