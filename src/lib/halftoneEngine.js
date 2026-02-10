@@ -214,55 +214,38 @@ export class HalftoneEngine {
                     d = abs(cellUV.y - wave * 2.0 * amp * 2.0); // Simple zigzag
                     radius = value * 0.35 * (size / 100.0);
                 } else if (pattern == 14) { // Heart
+                } else if (pattern == 14) { // Heart
                     vec2 p = cellUV;
-                    p.y += 0.1; // Shift up slightly to center vertically
-                    p.y *= -1.0; // Flip Y for shader coords
+                    p.y += 0.35; // Shift to center the heart (visually)
+                    // Standard SDF has tip at -1.0, lobes around +0.6. 
+                    // To center it at 0,0, we need to shift our coordinate system UP relative to shape (or shape DOWN).
+                    // If p is our UV (0 at center), and we want shape at center.
+                    // Shape center is approx y = -0.2?
+                    // Let's deduce: tip at -1. bounding box center ~ -0.2?
+                    // If we add to P.y, we shift the lookup point UP. Effectively moves shape DOWN.
+                    // So p.y += 0.35 moves shape down.
                     
-                    // Normalize size roughly to -1..1 range for the formula
-                    p *= 1.8; 
+                    // No Y flip needed if standard UV is Y-up.
+                    
+                    // Normalize size
+                    p *= 2.6; // Scale up coordinate space = shrink shape relative to cell
                     
                     p.x = abs(p.x);
 
                     if (p.y + p.x > 1.0) {
-                        d = sqrt(dot(p - vec2(0.25, 0.75), p - vec2(0.25, 0.75))) - 0.35355; // sqrt(2)/4
+                        d = sqrt(dot(p - vec2(0.25, 0.75), p - vec2(0.25, 0.75))) - 0.35355;
                     } else {
                         d = sqrt(min(dot(p - vec2(0.0, 1.0), p - vec2(0.0, 1.0)),
                                      dot(p - 0.5 * max(p.x + p.y, 0.0), p - 0.5 * max(p.x + p.y, 0.0)))) * sign(p.x - p.y);
                     }
                     
-                    // The SDF returns negative inside, positive outside for typical signed distance
-                    // But here we want d to be increasing effectively from center? 
-                    // Actually sdHeart returns positive outside.
-                    // So d is distance field.
-                    // We want to control size with radius.
-                    // d < radius.
-                    // Standard sdHeart is size ~1.0.
-                    // We scaled p by 1.8, so d is scaled.
-                    // We need to unscale or adjust radius/d comparison.
-                    // Let's use d directly but adjust the radius calculation to match.
+                    // Standard SDF is negative inside.
+                    // We want d increasing from center.
+                    // Center of heart (~midpoint) has negative distance.
+                    // Let's shift so deep inside is 0?
+                    d += 0.5; // Shift range
                     
-                    // With this formula, at boundary d=0. 
-                    // Inside is negative.
-                    // We typically use d = length(uv) which is 0 at center and grows.
-                    // So we want d_monotonic = d + shift?
-                    // Or just render shape at threshold?
-                    // Halftones need concentric shapes.
-                    // Is sdHeart concentric? Yes, isolines of SDF are rounded hearts.
-                    
-                    // We need d to be positive and increasing outwards from "center" (deep inside heart).
-                    // sdHeart is -0.5 at center roughly?
-                    // Let's shift it so center is 0.
-                    // Min value is roughly -0.5?
-                    // Let's just use d and adjust comparison.
-                    // If we want shape to grow from 0 to full cell:
-                    // value 0 -> radius 0 -> d < 0 (nothing)
-                    // value 1 -> radius large -> d < large (full fill)
-                    
-                    // Shift d so that center of heart is 0.
-                    d = d + 0.5;
-                    
-                    // Adjust radius scaling to match other shapes
-                    radius = value * 0.8 * (size / 100.0);
+                    radius = value * 0.7 * (size / 100.0);
 
                     
                 } else if (pattern == 15) { // Rounded Box
