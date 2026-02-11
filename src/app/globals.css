@@ -101,6 +101,7 @@ body {
 .header-info {
     font-family: 'Courier Prime', monospace;
     font-size: 9px;
+    font-weight: bold;
     color: var(--warm-gray);
     letter-spacing: 2px;
 }
